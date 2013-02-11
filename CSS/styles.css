@@ -1,0 +1,51 @@
+input {
+	display: inline-block;
+}
+.myInputs {
+	width:125px;
+	color : grey;
+	font-style:italic;
+}
+body{
+	font-family: Arial, Verdana, sans-serif;
+}
+h1 {
+	margin-bottom: 0px;
+	text-align: center;
+	background-color: yellow
+}
+.error{
+	color : red;
+}
+#container {
+	width:100%;
+	height:auto;	
+	margin:0px;
+	text-align: center;
+}
+
+#container #trying_table_div {	
+	left : 856px;
+	position: fixed;
+	border: 5px solid #000000;	
+	margin: 15px;
+}
+
+#trying_table_div,#playing_table,th,td{
+	border : 1px solid black;	
+}
+#container #playing_table td{
+	height : 50px;
+}
+#container #playing_table {
+	float:left;
+	width: 850px;
+	height: 100px;
+	margin: 5px;	
+}
+
+#trying_table_div, #myData_table, #playing_table, #set_number{
+	display:none;
+}
+
+

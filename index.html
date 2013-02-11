@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<link rel="stylesheet" type="text/css" href="CSS/styles.css">	
+ 	<style type="text/css"> 	 
+ 	 h3 {text-align: center; font-size: 18.5px; }	 
+ 	 
+	</style>	
+	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js">
+</script> 
+
+	<script type="text/javascript">
+
+	var Client = function() {
+
+		var privateUuid,tabla_length;
+		var triedNumbers = [];
+		var publicUuid_oponent;	
+
+		var register = function(name) {
+			$.ajax({
+				url:$("#server_name").val() + "/players/register/" + name})
+				.statusCode({
+					404:function(){alert("Not found")},
+					520:function(){
+						$("#index").append('<p class="error">Ese nombre ya ha sido elegido</br>por favor ingrese otro.</p>');
+					},
+					200:function(){$("#index").hide(200,function(){$("#set_number").show(200)});}
+				})
+				.done(function(data){
+						privateUuid = data.privateUuid;
+					}); 
+			}		
+
+		var setNumber = function(number){
+			$.ajax({
+				url: $("#server_name").val() + "/play/setnumber/" + privateUuid + "/" + number})
+				.statusCode({
+					200:function(){$("#set_number").hide(200,function(){$("#playing_table").show()});},
+					521:function(){alert("The privateUuid was not found")},
+					528:function(){alert("The number you sent us is invalid")},
+					523:function(){alert("lala")}
+
+				})
+				.done($("#privateUuid_box").val(privateUuid)); 
+			}
+
+		var board = function(){			
+			$.ajax({
+				url: $("#server_name").val() + "/players/board/" + privateUuid})
+			.done(function(board_info){	
+					//$(".container").remove();			
+					showMe(board_info);
+				})
+			}
+
+		//Imprimo la tabla de jugadores!
+		var showMe = function(board_info){
+
+			if(board_info.me[0].numberActivated!=true){				
+				$("#playing_table").hide(200);
+				$("#trying_table_div").hide(200);
+				$("#set_number").show(200)
+				$("#set_number").append('<p id="guessedNumber">Su number ha sido adivinado </br> debe ingresar otro</p>');	
+				$("#guessedNumber").css('color','red');
+				clearInterval(myInterval);//dejo de actualizar la tabla	
+
+			}else{	
+
+			$(".filas").remove();			
+			var players = board_info.players;
+			var tabla = document.getElementById("playing_table");					
+
+			for(a=0;a<players.length;a++){	
+
+				if(players[a].numberActivated==true){
+				//genero avatar para el jugador	
+				url = "http://permissiondenied.net/identicon/50/"+players[a]	.publicUuid+".png";
+				//-------------------
+				var fila = tabla.insertRow(-1);	
+					fila.setAttribute('class','filas');			
+					
+				fila.onclick = function(numberId,_publicUuid_oponent,avatar_url) {
+					return function(){								
+						$("#avatar").remove();
+						$(".error").remove();
+						$("#try_button").removeAttr('disabled');
+						$("#trying_table_div").prepend('<p id="avatar">Jugar con: </br><img src='+avatar_url+'></p>');						
+						$("#trying_table_div").show();	
+						$("#trying_table .id_row").remove();
+						publicUuid_oponent = _publicUuid_oponent;				
+						iniciarPartida(numberId);
+					};
+				}(players[a].numberId,players[a].publicUuid,url);
+
+			for(i=0;i<5;i++){
+				var celda = fila.insertCell(i);
+
+				switch(i){
+				case 0: celda.setAttribute("background",url);	
+						break;
+				case 1:	celda.innerHTML = players[a].publicUuid;
+						break;
+				case 2:	celda.innerHTML = players[a].numberActivated;
+						break;
+				case 3: celda.innerHTML = players[a].numberId;
+						break;
+				case 4: celda.innerHTML = players[a].score;
+						break;										
+					}
+				}
+			  }
+			}
+			$("#playing_table tr:odd").css("background-color", "#EBC2FF")
+		  }
+		}
+		var iniciarPartida = function(numberId){
+									
+			if(triedNumbers[numberId]){				
+				imprimirTabla(triedNumbers[numberId]);
+			}else{
+				triedNumbers[numberId]=[];
+			}
+		}
+
+		//si ya jugue con ese numero, imprimo la tabla con los valores
+		//que tenia guardado, de lo contrario imprimo tabla nueva.
+		var imprimirTabla = function(array){			
+			var tabla = document.getElementById("trying_table");
+			
+			for(a=0;a<array.length;a++){
+				var fila = tabla.insertRow(-1);
+					fila.setAttribute("class","id_row");
+				for(i=0;i<5;i++){
+					var celda = fila.insertCell(i);
+
+					switch(i){
+						case 0: celda.innerHTML = array[a].number;					
+								break;
+						case 1: celda.innerHTML = array[a].numberId;
+								break;
+						case 2: celda.innerHTML = array[a].correctChars;				
+								break;
+						case 3: celda.innerHTML = array[a].existingChars;
+								break;
+						case 4: celda.innerHTML = array[a].wrongChars;
+								break;		
+					}
+				}				
+			}		
+			
+		}
+
+		//Envío ajax del número que el usuario intetna adivinar.
+		var tryThisNumber = function(number){
+			if(isNaN(number) || number.length!=4){
+				$("#trying_table_div").append('<p class="error">Solo puede ingresar numeros de 4 digitos</p>')
+				$("#try_button").removeAttr('disabled')
+			}else{
+				$.ajax({
+				url:$("#server_name").val()+"/play/guessnumber/"+privateUuid+ "/" + publicUuid_oponent + "/" + number})
+				.statusCode({
+					200:function(){},
+					524:function(){alert("You must wait few seconds to continue")},
+					525:function(){},
+					529:function(){alert("User tries to guess his own number")},
+					526:function(){alert("Public UUID was not found")},
+					527:function(){
+						$("#trying_table_div").append('<p class="error"> Ya han adivinado el numero de este jugador </br> intente jugar con otro</p>');
+					}
+				})
+				.done(function(data){
+					//El jugador no podra enviar muchos numeros seguidos sin aguardar un tiempo
+					setTimeout(function(){$("#try_button").removeAttr('disabled')},data.timeToNextAttemp);
+					imprimir(data);
+				})
+			}			
+		}	
+
+		//Imprimo la tabla del número al que estoy intentado adivinar.		
+		var imprimir = function(data){
+			var tabla = document.getElementById("trying_table");
+
+			var fila = tabla.insertRow(-1);
+				fila.setAttribute("class","id_row");
+			for(i=0;i<5;i++){
+			var celda = fila.insertCell(i);
+				switch(i){
+					case 0: celda.innerHTML = data.number;
+							break;
+					case 1: celda.innerHTML = data.numberId;
+							break;
+					case 2: celda.innerHTML = data.correctChars;
+							if(data.correctChars==4){
+									$("#trying_table_div")
+									.append('<p class="congrats" style="color:green">Felicitacion has adivinado el numero de tu oponente</br>intenta jugar con otro</p>');
+									setTimeout(function(){
+										$(".congrats").remove();
+									},2000);
+								}
+							break;
+					case 3: celda.innerHTML = data.existingChars;						
+							break;
+					case 4: celda.innerHTML = data.wrongChars;
+							break;								
+				}
+			}
+			triedNumbers[data.numberId].push(
+				{
+					"number":data.number,
+					"numberId" : data.numberId,
+					"correctChars" : data.correctChars,
+					"existingChars" : data.existingChars,
+					"wrongChars" : data.wrongChars
+						})
+		}
+		//Verifico si el numero que ingresa el usuario es correcto
+		//para la registración
+		var verificarNumero = function(number){
+			if(isNaN(number) || number.length!=4){
+				$("#set_number").append('<p class="error">Debe ingresar solamente numeros de 4 digitos</p>');
+			}
+				else{
+			flag = true;
+			for(a=0;a<number.length-1;a++){
+				for(i=a+1;i<number.length;i++){
+					if(number[a]==number[i]){
+						flag=false;					
+					}
+				}
+			}
+			if (flag==true){
+				setNumber(number);	
+				myInterval = setInterval(function(){
+						board({});
+						},1000);
+
+			}else{
+				$("#errorOfnumber").remove();
+				$("#set_number").append('<p class="error">El numero ingresado es incorrecto</p>');
+				$("#errorOfnumber").css("color","red");
+			}
+		 }	
+		}
+		return {			
+			"registrar"   : register,
+			"privateUuid" : privateUuid,
+			"setNumber"	  : setNumber,	  	
+			"board"		  : board,			
+			"tryThisNumber"	: tryThisNumber,
+			"verificarNumero" : verificarNumero			
+		}	
+}
+	
+
+	var cliente = Client();
+
+	//*********************************************
+	$(document).ready(function() {
+
+				$("#playing_button").click(function(){
+					$("#playing_button").attr('disabled', false);
+				})
+				var index = $("#index"),
+					set_number = $("#set_number"),
+					playing = $("#playing");
+
+				var usuario_box = $("#usuario");
+					usuario_box.click(function() {	
+					$(".error").remove();						
+					usuario_box.val("");
+					usuario_box.css("color","black");
+					usuario_box.css("font-style","normal");
+						});
+
+				var server_box = $('#server_name');	
+					server_box.click(function(){					
+					server_box.val("");
+					server_box.css("color","black");
+					server_box.css("font-style","normal");
+						});
+
+				var port_box = $('#port');	
+					port_box.click(function(){					
+					port_box.val("");
+					port_box.css("color","black");
+					port_box.css("font-style","normal");
+						});
+
+				$('#siguiente1').click(function(){									
+					cliente.registrar(usuario_box.val());
+					});
+
+				var	my_number_box =  $('#my_number');
+					my_number_box.click(function(){
+					$(".error").remove();	
+					$("#guessedNumber").remove();
+					my_number_box.val("");
+					my_number_box.css("color","black");
+					my_number_box.css("font-style","normal");
+					});
+				
+				$("#siguiente2").click(function(){		
+					$("#set_number #guessedNumber").remove();		
+					cliente.verificarNumero(my_number_box.val());	
+				}); 
+
+				
+				$("#try_button").click(function(){
+					$("#try_button").attr("disabled", "disabled");
+					cliente.tryThisNumber($("#trying_send").val());
+
+				})
+				$("#trying_send").click(function(){
+					$("#trying_send").val("");
+					$("#trying_send").css("font-style","normal");
+					$(".error").remove();
+				})
+
+	
+	});		
+</script>
+</head>
+
+<body>
+<div id="container">	
+<h1>Guess My Number </h1>
+
+<!-- Registro de usuario  -->
+<div id="index" align="center">
+	<h3> <u> Llene los campos con su informacion </u></h3>
+	
+		<form>
+ 			<input type="text" class="myInputs" id="usuario" value="Nombre Usuario"><br>
+ 			<input type="text" class="myInputs" id="server_name"  value="http://guessmynumber.jurgens.com.ar"><br>
+ 			<input type="text" class="myInputs" id="port" value="80"><br><br>
+ 			<input type="button" style="width:80" value="Siguiente" id="siguiente1" >
+		</form>
+	
+</div>
+</br>
+
+<!-- Registro de número  -->
+<div id="set_number" align="center">
+	<p>Los digitos no deben estar repetidos</p>
+	<input type="text" class="myInputs" value="Ingrese su numero" maxlength="4" id="my_number" /><br><br>
+	<input type="button" style="width:80" value="Siguiente" id="siguiente2" />
+</div>
+
+</br>	
+ <!-- tabla general con todos los jugadores -->
+	<table id="playing_table">
+	   <tr>  		 
+	   		<th> Player </th>
+	   		<th> Public Uuid </th> 
+	   		<th> Number Actived </th>
+	   		<th> Number ID </th>
+	   	 	<th> Score </th>	   	 	
+	   </tr>		   	 
+	</table>
+
+<!-- Tabla para intentar adivinar los números -->
+<div id="trying_table_div">
+	
+	<table id="trying_table">
+		<tr> 
+			<th>Number</th>
+			<th>NumberId</th>
+			<th>Correct Chars</th>
+			<th>Existing Chars</th>
+			<th>Wrong Chars</th>		
+		</tr>
+	</table>
+	<table>	
+		<tr id="trying_buttons">
+	   		<td><input type="text" maxlength="4" id="trying_send"class="myInputs" value="Inserte un numero"/></td>
+	   </tr>			
+	</table>
+	<input type="button" value="Intentar" id="try_button" />
+</div>
+
+</br>
+
+ <!-- tabla con mis datos -->
+	<table id="myData_table">
+		<tr> 
+			<th>PrivateUuid</th>
+			<th>NumberActived</th>
+			<th>Score</th>
+		</tr>
+		<tr>
+			<td><input type="text" style="width:150" id="privateUuid_box"></td>
+			<td><input type="text" style="width:150" id="numberActived_box"></td>
+			<td><input type="text" style="width:150" id="score_box"></td>
+		</tr>
+	</table>
+</div> 
+</body>
+
+</html>
